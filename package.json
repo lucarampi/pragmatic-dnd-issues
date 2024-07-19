@@ -9,18 +9,39 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@atlaskit/analytics-next": "^9.2.0",
+    "@atlaskit/app-provider": "latest",
+    "@atlaskit/button": "19.0.0",
+    "@atlaskit/css-reset": "latest",
+    "@atlaskit/dropdown-menu": "12.14.2",
+    "@atlaskit/ds-lib": "2.3.1",
+    "@atlaskit/focus-ring": "1.5.0",
+    "@atlaskit/form": "10.4.7",
+    "@atlaskit/icon": "22.6.0",
+    "@atlaskit/modal-dialog": "12.14.5",
+    "@atlaskit/pragmatic-drag-and-drop": "1.2.1",
+    "@atlaskit/pragmatic-drag-and-drop-docs": "1.1.0",
+    "@atlaskit/pragmatic-drag-and-drop-flourish": "1.1.0",
+    "@atlaskit/pragmatic-drag-and-drop-hitbox": "1.0.3",
+    "@atlaskit/pragmatic-drag-and-drop-live-region": "1.0.6",
+    "@atlaskit/pragmatic-drag-and-drop-react-drop-indicator": "1.1.1",
+    "@atlaskit/select": "17.11.7",
+    "@atlaskit/tokens": "1.56.0",
+    "memoize-one": "^6.0.0",
+    "next": "14.2.5",
     "react": "^18",
     "react-dom": "^18",
-    "next": "14.2.5"
+    "styled-components": "3.2.6",
+    "tiny-invariant": "^1.2.0"
   },
   "devDependencies": {
-    "typescript": "^5",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
-    "postcss": "^8",
-    "tailwindcss": "^3.4.1",
     "eslint": "^8",
-    "eslint-config-next": "14.2.5"
+    "eslint-config-next": "14.2.5",
+    "postcss": "^8",
+    "tailwindcss": "^3.4.6",
+    "typescript": "^5"
   }
 }
