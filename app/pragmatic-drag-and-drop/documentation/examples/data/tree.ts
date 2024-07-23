@@ -3,6 +3,9 @@ import invariant from "tiny-invariant";
 import type { Instruction } from "@atlaskit/pragmatic-drag-and-drop-hitbox/tree-item";
 import { ElementDragPayload } from "@atlaskit/pragmatic-drag-and-drop/dist/types/internal-types";
 
+import { produce } from "immer";
+import { nanoid } from "nanoid";
+
 const VALID_DRAGGABLE_TYPES: BaseTreeItem["type"][] = ["attribute", "group"];
 
 export const isDraggableItem = (item: BaseTreeItem) =>
@@ -20,7 +23,7 @@ interface GroupTreeItem extends BaseTreeItem {
   type: "group";
 }
 
-interface AttributeTreeItem extends BaseTreeItem {
+export interface AttributeTreeItem extends BaseTreeItem {
   type: "attribute";
   data: {
     attribute: TreeAttributeData;
@@ -34,9 +37,9 @@ interface FooterTreeItem extends BaseTreeItem {
   };
 }
 
-// export type TreeItemData = {
-//   attribute: TreeAttributeData;
-// };
+export type TreeItemData = {
+  attribute: TreeAttributeData;
+};
 
 type TreeAttributeData = {
   name: string;
@@ -75,46 +78,7 @@ export function getInitialData(): TreeItem[] {
           children: [
             {
               id: "1.3.1",
-              children: [
-                {
-                  id: "1.3.9",
-                  children: [
-                    {
-                      id: "1.3.32",
-                      children: [
-                        {
-                          id: "1.3.211",
-                          children: [],
-                          type: "attribute",
-                          data: {
-                            attribute: {
-                              name: "attribute 1",
-                              value: "value 1",
-                              operator: "=",
-                            },
-                          },
-                        },
-                      ],
-                      type: "attribute",
-                      data: {
-                        attribute: {
-                          name: "attribute 1",
-                          value: "value 1",
-                          operator: "=",
-                        },
-                      },
-                    },
-                  ],
-                  type: "attribute",
-                  data: {
-                    attribute: {
-                      name: "attribute 1",
-                      value: "value 1",
-                      operator: "=",
-                    },
-                  },
-                },
-              ],
+              children: [],
               type: "attribute",
               data: {
                 attribute: {
@@ -165,26 +129,44 @@ export type TreeAction =
   | {
       type: "toggle";
       itemId: string;
+      force?: boolean;
     }
   | {
       type: "expand";
       itemId: string;
+      force?: boolean;
     }
   | {
       type: "collapse";
       itemId: string;
+      force?: boolean;
+    }
+  | {
+      type: "attribute-data-update";
+      itemId: string;
+      attributeData?: Partial<AttributeTreeItem["data"]["attribute"]>;
+    }
+  | {
+      type: "add-group";
+      targetId: string;
+      newGroup?: GroupTreeItem;
+    }
+  | {
+      type: "add-attribute";
+      targetId: string;
+      newAttribute?: AttributeTreeItem;
     }
   | { type: "modal-move"; itemId: string; targetId: string; index: number };
 
-export const tree = {
+export const treeHelper = {
   remove(data: TreeItem[], id: string): TreeItem[] {
     return data
       .filter((item) => item.id !== id)
       .map((item) => {
-        if (tree.hasChildren(item)) {
+        if (treeHelper.hasChildren(item)) {
           return {
             ...item,
-            children: tree.remove(item.children, id),
+            children: treeHelper.remove(item.children, id),
           };
         }
         return item;
@@ -199,10 +181,10 @@ export const tree = {
       if (item.id === targetId) {
         return [newItem, item];
       }
-      if (tree.hasChildren(item)) {
+      if (treeHelper.hasChildren(item)) {
         return {
           ...item,
-          children: tree.insertBefore(item.children, targetId, newItem),
+          children: treeHelper.insertBefore(item.children, targetId, newItem),
         };
       }
       return item;
@@ -218,10 +200,10 @@ export const tree = {
         return [item, newItem];
       }
 
-      if (tree.hasChildren(item)) {
+      if (treeHelper.hasChildren(item)) {
         return {
           ...item,
-          children: tree.insertAfter(item.children, targetId, newItem),
+          children: treeHelper.insertAfter(item.children, targetId, newItem),
         };
       }
 
@@ -244,13 +226,13 @@ export const tree = {
         };
       }
 
-      if (!tree.hasChildren(item)) {
+      if (!treeHelper.hasChildren(item)) {
         return item;
       }
 
       return {
         ...item,
-        children: tree.insertChild(item.children, targetId, newItem),
+        children: treeHelper.insertChild(item.children, targetId, newItem),
       };
     });
   },
@@ -260,8 +242,8 @@ export const tree = {
         return item;
       }
 
-      if (tree.hasChildren(item)) {
-        const result = tree.find(item.children, itemId);
+      if (treeHelper.hasChildren(item)) {
+        const result = treeHelper.find(item.children, itemId);
         if (result) {
           return result;
         }
@@ -281,7 +263,7 @@ export const tree = {
       if (item.id === targetId) {
         return parentIds;
       }
-      const nested = tree.getPathToItem({
+      const nested = treeHelper.getPathToItem({
         current: item.children,
         targetId: targetId,
         parentIds: [...parentIds, item.id],
@@ -293,6 +275,35 @@ export const tree = {
   },
   hasChildren(item: TreeItem): boolean {
     return item.children.length > 0;
+  },
+  updateAttributeData(
+    tree: TreeItem[],
+    itemId: string,
+    attributeData: TreeItemData["attribute"]
+  ): TreeItem[] {
+    return tree.map((item) => {
+      const isAttribute = item.type === "attribute";
+      if (item.id === itemId && isAttribute) {
+        return {
+          ...item,
+          data: {
+            attribute: { ...attributeData },
+          },
+        };
+      }
+
+      if (treeHelper.hasChildren(item)) {
+        return {
+          ...item,
+          children: treeHelper.updateAttributeData(
+            item.children,
+            itemId,
+            attributeData
+          ),
+        };
+      }
+      return item;
+    });
   },
 };
 
@@ -306,89 +317,134 @@ export function treeStateReducer(
   };
 }
 
-const dataReducer = (data: TreeItem[], action: TreeAction) => {
+const dataReducer = (tree: TreeItem[], action: TreeAction) => {
   console.log("action", action);
 
-  const item = tree.find(data, action.itemId);
+  if (action.type === "add-group") {
+    const { targetId, newGroup } = action;
+    let groupToAdd = newGroup;
+
+    if (!groupToAdd) {
+      groupToAdd = {
+        id: nanoid(),
+        children: [],
+        type: "group",
+        open: true,
+      };
+    }
+    return treeHelper.insertChild(tree, targetId, groupToAdd);
+  }
+
+  if (action.type === "add-attribute") {
+    const { targetId, newAttribute: newGroup } = action;
+    let attributeToAdd = newGroup;
+
+    if (!attributeToAdd) {
+      attributeToAdd = {
+        id: nanoid(),
+        children: [],
+        type: "attribute",
+        data: {
+          attribute: {
+            name: "New Attribute",
+            value: "",
+            operator: "=",
+          },
+        },
+      };
+    }
+    return treeHelper.insertChild(tree, targetId, attributeToAdd);
+  }
+
+  invariant(action.itemId, "'itemId' is required for this action!");
+
+  const item = treeHelper.find(tree, action.itemId);
   if (!item) {
-    return data;
+    return tree;
   }
 
   if (action.type === "instruction") {
     const instruction = action.instruction;
 
     if (instruction.type === "reparent") {
-      const path = tree.getPathToItem({
-        current: data,
+      const path = treeHelper.getPathToItem({
+        current: tree,
         targetId: action.targetId,
       });
       invariant(path);
       const desiredId = path[instruction.desiredLevel];
-      let result = tree.remove(data, action.itemId);
-      result = tree.insertAfter(result, desiredId, item);
+      let result = treeHelper.remove(tree, action.itemId);
+      result = treeHelper.insertAfter(result, desiredId, item);
       return result;
     }
 
     // the rest of the actions require you to drop on something else
     if (action.itemId === action.targetId) {
-      return data;
+      return tree;
     }
 
     if (instruction.type === "reorder-above") {
-      let result = tree.remove(data, action.itemId);
-      result = tree.insertBefore(result, action.targetId, item);
+      let result = treeHelper.remove(tree, action.itemId);
+      result = treeHelper.insertBefore(result, action.targetId, item);
       return result;
     }
 
     if (instruction.type === "reorder-below") {
-      let result = tree.remove(data, action.itemId);
-      result = tree.insertAfter(result, action.targetId, item);
+      let result = treeHelper.remove(tree, action.itemId);
+      result = treeHelper.insertAfter(result, action.targetId, item);
       return result;
     }
 
     if (instruction.type === "make-child") {
-      let result = tree.remove(data, action.itemId);
-      result = tree.insertChild(result, action.targetId, item);
+      let result = treeHelper.remove(tree, action.itemId);
+      result = treeHelper.insertChild(result, action.targetId, item);
       return result;
     }
 
     console.warn("TODO: action not implemented", instruction);
 
-    return data;
+    return tree;
   }
 
-  function toggle(item: TreeItem): TreeItem {
-    if (!tree.hasChildren(item)) {
+  function toggle(
+    item: TreeItem,
+    targetId: string,
+    force: boolean = false
+  ): TreeItem {
+    if (!force && !treeHelper.hasChildren(item)) {
       return item;
     }
 
-    if (item.id === action.itemId) {
-      return { ...item, open: !item?.open };
+    if (item.id === targetId) {
+      return { ...item, open: !item?.open, force };
     }
 
-    return { ...item, children: item.children.map(toggle) };
+    return {
+      ...item,
+      children: item.children.map((child) => toggle(child, targetId, force)),
+    };
   }
 
   if (action.type === "toggle") {
-    return data.map(toggle);
+    return tree.map((item) => toggle(item, action.itemId, action?.force));
   }
 
   if (action.type === "expand") {
-    if (tree.hasChildren(item) && !item?.open) {
-      return data.map(toggle);
+    if ((treeHelper.hasChildren(item) || action?.force) && !item?.open) {
+      return tree.map((item) => toggle(item, action.itemId, action?.force));
     }
-    return data;
+    return tree;
   }
 
   if (action.type === "collapse") {
-    if (tree.hasChildren(item) && item?.open) {
-      return data.map(toggle);
+    if ((treeHelper.hasChildren(item) || action?.force) && item?.open) {
+      return tree.map((item) => toggle(item, action.itemId, action?.force));
     }
-    return data;
+    return tree;
   }
 
   if (action.type === "modal-move") {
-    let result = tree.remove(data, item.id);
+    let result = treeHelper.remove(tree, item.id);
 
     const siblingItems = getChildItems(result, action.targetId);
 
@@ -404,27 +460,45 @@ const dataReducer = (data: TreeItem[], action: TreeAction) => {
          * Otherwise for deeper levels that have no children, we need to
          * use `insertChild` instead of inserting relative to a sibling.
          */
-        result = tree.insertChild(result, action.targetId, item);
+        result = treeHelper.insertChild(result, action.targetId, item);
       }
     } else if (action.index === siblingItems.length) {
       const relativeTo = siblingItems[siblingItems.length - 1];
       /**
        * If the position selected is the end, we insert after the last item.
        */
-      result = tree.insertAfter(result, relativeTo.id, item);
+      result = treeHelper.insertAfter(result, relativeTo.id, item);
     } else {
       const relativeTo = siblingItems[action.index];
       /**
        * Otherwise we insert before the existing item in the given position.
        * This results in the new item being in that position.
        */
-      result = tree.insertBefore(result, relativeTo.id, item);
+      result = treeHelper.insertBefore(result, relativeTo.id, item);
     }
 
     return result;
   }
 
-  return data;
+  if (action.type === "attribute-data-update") {
+    // Validate that the action is for an attribute item and that the data is present
+    const isAttribute = item.type === "attribute";
+    invariant(isAttribute, "Cannot update data for non-attribute item.");
+    invariant(action.attributeData, "Missing data for attribute-data-update.");
+    const incomingData = action.attributeData;
+
+    const updatedData: TreeItemData["attribute"] = produce(
+      item.data.attribute,
+      (draft) => {
+        draft.name = incomingData.name ?? draft.name;
+        draft.value = incomingData.value ?? draft.value;
+        draft.operator = incomingData.operator ?? draft.operator;
+      }
+    );
+    return treeHelper.updateAttributeData(tree, action.itemId, updatedData);
+  }
+
+  return tree;
 };
 
 function getChildItems(data: TreeItem[], targetId: string) {
@@ -435,7 +509,7 @@ function getChildItems(data: TreeItem[], targetId: string) {
     return data;
   }
 
-  const targetItem = tree.find(data, targetId);
+  const targetItem = treeHelper.find(data, targetId);
   invariant(targetItem);
 
   return targetItem.children;

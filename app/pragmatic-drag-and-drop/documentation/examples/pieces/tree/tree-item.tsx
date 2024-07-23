@@ -28,8 +28,17 @@ import {
 import { setCustomNativeDragPreview } from "@atlaskit/pragmatic-drag-and-drop/element/set-custom-native-drag-preview";
 import type { DragLocationHistory } from "@atlaskit/pragmatic-drag-and-drop/types";
 import { token } from "@atlaskit/tokens";
+import {
+  GitPullRequestCreate,
+  GitPullRequestCreateArrow,
+  GripVertical,
+  ListPlus,
+  Plus,
+  Trash2,
+} from "lucide-react";
 
 import {
+  AttributeTreeItem,
   DraggingSourceData,
   getDraggingSourceData,
   type TreeItem as TreeItemType,
@@ -38,8 +47,23 @@ import {
 import { indentPerLevel } from "./constants";
 import { MoveDialog } from "./move-dialog";
 import { DependencyContext, TreeContext } from "./tree-context";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 const iconColor = token("color.icon", "#44546F");
+
+const OPERATORS = ["=", ">", "<", ">=", "<=", "!="];
 
 function DragPreview({ item }: { item: TreeItemType }) {
   const showChildrenCount = item.type === "group" && item.children.length > 0;
@@ -58,22 +82,14 @@ function DragPreview({ item }: { item: TreeItemType }) {
   );
 }
 
-function ChildIcon() {
-  return (
-    <svg aria-hidden={true} width={24} height={24} viewBox="0 0 24 24">
-      <circle cx={12} cy={12} r={2} fill={iconColor} />
-    </svg>
-  );
-}
-
 function GroupIcon({ open }: { open: boolean }) {
   const Icon = open ? ChevronDownIcon : ChevronRightIcon;
   return <Icon label="" primaryColor={iconColor} />;
 }
 
 function Icon({ item }: { item: TreeItemType }) {
-  if (!item.children.length) {
-    return <ChildIcon />;
+  if (item.type !== "group") {
+    return null;
   }
   return <GroupIcon open={!!item?.open} />;
 }
@@ -119,8 +135,8 @@ const TreeItemRenerer = memo(function TreeItemRenerer({
   index: number;
 }) {
   const treeItemRef = useRef<HTMLDivElement>(null);
+  const dragHandleRef = useRef<HTMLDivElement>(null);
   const isRoot = thisTreeItem?.treeRole === "root" && level === 0;
-  const isFooter = thisTreeItem.type === "footer";
   const isGroup = thisTreeItem.type === "group";
   const isAttribute = thisTreeItem.type === "attribute";
   const isOpen = thisTreeItem?.open ?? false;
@@ -135,7 +151,7 @@ const TreeItemRenerer = memo(function TreeItemRenerer({
   const { DropIndicator, attachInstruction, extractInstruction } =
     useContext(DependencyContext);
   const toggleOpen = useCallback(() => {
-    dispatch({ type: "toggle", itemId: thisTreeItem.id });
+    dispatch({ type: "toggle", itemId: thisTreeItem.id, force: true });
   }, [dispatch, thisTreeItem]);
 
   useEffect(() => {
@@ -187,6 +203,7 @@ const TreeItemRenerer = memo(function TreeItemRenerer({
 
   useEffect(() => {
     invariant(treeItemRef.current);
+    invariant(dragHandleRef.current);
 
     function updateIsParentOfInstruction({
       location,
@@ -203,6 +220,7 @@ const TreeItemRenerer = memo(function TreeItemRenerer({
     return combine(
       draggable({
         element: treeItemRef.current,
+        dragHandle: dragHandleRef.current,
         getInitialData: () => {
           const initialData: DraggingSourceData = {
             draggingItem: thisTreeItem,
@@ -369,28 +387,157 @@ const TreeItemRenerer = memo(function TreeItemRenerer({
     [cancelExpand]
   );
 
-  const [isMoveDialogOpen, setIsMoveDialogOpen] = useState(false);
-
   return (
     <Fragment>
-      <div className="relative">
+      <div key={thisTreeItem.id} className="relative">
         <div
           id={`tree-item-${thisTreeItem.id}`}
+          key={`tree-item-${thisTreeItem.id}`}
           onClick={toggleOpen}
           ref={treeItemRef}
-          style={{ paddingLeft: level * indentPerLevel }}
+          style={{ marginLeft: level * indentPerLevel }}
           data-state={state}
           data-index={index}
           data-level={level}
           data-testid={`tree-item-${thisTreeItem.id}`}
-          className="bg-slate-50 border border-transparent items-center flex hover:bg-slate-100 cursor-pointer rounded px-2 py-1 data-[state=dragging]:opacity-50 data-[state=parent-of-instruction]:bg-blue-50 data-[state=parent-of-instruction]:border-blue-300 "
+          className=" border border-transparent items-center min-w-[600px]  hover:border-blue-500 w-[600px] max-w-[600px] flex gap-2 cursor-pointer rounded px-2 py-1 data-[state=dragging]:opacity-50 data-[state=parent-of-instruction]:bg-blue-50 data-[state=parent-of-instruction]:border-blue-300 "
         >
-          <Icon item={thisTreeItem} />
-          <span>Item {thisTreeItem.id}</span>
-          <small>
-            {isAttribute ? <code>Attr.</code> : null}
-            <code>({mode})</code>
-          </small>
+          <div
+            className={cn(
+              "flex gap-2 items-center w-full ",
+              isGroup ? " sticky top-0" : ""
+            )}
+          >
+            <div ref={dragHandleRef} className="h-full">
+              <GripVertical className="cursor-move w-4 h-4 text-slate-500" />
+            </div>
+            <Icon item={thisTreeItem} />
+            <div className="flex gap-2 items-center w-full ">
+              {isGroup && (
+                <>
+                  <div className=" rounded flex justify-center items-center text-slate-500 font-medium bg-blue-100 p-0.5 px-1 min-w-5 text-xs">
+                    {thisTreeItem.children.length}
+                  </div>
+                  <ToggleGroup
+                    onClick={(ev) => {
+                      ev.stopPropagation();
+                    }}
+                    type="single"
+                  >
+                    <ToggleGroupItem value="bold" aria-label="Toggle bold">
+                      AND
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="italic" aria-label="Toggle italic">
+                      OR
+                    </ToggleGroupItem>
+                  </ToggleGroup>
+
+                  {isGroup && (
+                    <div
+                      className={cn(
+                        "ml-auto",
+                        isOpen || !hasChildren ? "flex" : "hidden"
+                      )}
+                    >
+                      <div
+                        onClick={(ev) => {
+                          ev.stopPropagation();
+                        }}
+                        className="pl-6 flex items-center gap-2"
+                      >
+                        <Button
+                          variant={"secondary"}
+                          className=" px-2.5"
+                          onClick={() =>
+                            dispatch({
+                              type: "add-group",
+                              targetId: thisTreeItem.id,
+                            })
+                          }
+                        >
+                          <GitPullRequestCreate className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant={"secondary"}
+                          className=" px-2.5"
+                          onClick={() =>
+                            dispatch({
+                              type: "add-attribute",
+                              targetId: thisTreeItem.id,
+                            })
+                          }
+                        >
+                          <ListPlus className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+              {isAttribute && (
+                <>
+                  <Input
+                    onChange={(ev) => {
+                      const value = {
+                        name: ev.target.value,
+                      };
+                      dispatch({
+                        type: "attribute-data-update",
+                        itemId: thisTreeItem.id,
+                        attributeData: value,
+                      });
+                    }}
+                    value={thisTreeItem.data.attribute.name}
+                  />
+                  <Select
+                    onValueChange={(operator) => {
+                      const value = {
+                        operator,
+                      };
+                      dispatch({
+                        type: "attribute-data-update",
+                        itemId: thisTreeItem.id,
+                        attributeData: value,
+                      });
+                    }}
+                    value={thisTreeItem.data.attribute.operator}
+                  >
+                    <SelectTrigger className="min-w-16 w-16 text-center ">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="min-w-16 w-16">
+                      {OPERATORS.map((operator) => (
+                        <SelectItem key={operator} value={operator}>
+                          {operator}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    className="w-36"
+                    value={thisTreeItem.data.attribute.value}
+                    onChange={(ev) => {
+                      const value = {
+                        value: ev.target.value,
+                      };
+                      dispatch({
+                        type: "attribute-data-update",
+                        itemId: thisTreeItem.id,
+                        attributeData: value,
+                      });
+                    }}
+                  />
+                  <Button
+                    size={"icon"}
+                    className="px-2 hover:text-red-600 hover:bg-red-50"
+                    variant={"ghost"}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
           {instruction ? <DropIndicator instruction={instruction} /> : null}
         </div>
       </div>
@@ -420,6 +567,31 @@ const TreeItemRenerer = memo(function TreeItemRenerer({
           })}
         </div>
       ) : null}
+      {/* {mode ===
+        "last-in-group" && (
+          <div>
+            {isGroup && (
+              <div
+                className="flex items-center gap-2 cursor-pointer text-blue-500"
+                onClick={() =>
+                  dispatch({ type: "add-group", parentId: thisTreeItem.id })
+                }
+              >
+                <span>Add Group</span>
+              </div>
+            )}
+            {isAttribute && (
+              <div
+                className="flex items-center gap-2 cursor-pointer text-blue-500"
+                onClick={() =>
+                  dispatch({ type: "add-attribute", parentId: thisTreeItem.id })
+                }
+              >
+                <span>Add Attribute</span>
+              </div>
+            )}
+          </div>
+        )} */}
     </Fragment>
   );
 });

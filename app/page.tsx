@@ -26,7 +26,7 @@ import {
   getDraggingSourceData,
   getInitialTreeState,
   isDraggableItem,
-  tree,
+  treeHelper,
   type TreeItem as TreeItemType,
   treeStateReducer,
 } from "./pragmatic-drag-and-drop/documentation/examples/data/tree";
@@ -179,7 +179,7 @@ export default function Tree() {
       return data;
     }
 
-    const item = tree.find(data, itemId);
+    const item = treeHelper.find(data, itemId);
     invariant(item);
     return item.children;
   }, []);
@@ -193,7 +193,10 @@ export default function Tree() {
       // to allow quick lookups of parents
       getPathToItem: memoizeOne(
         (targetId: string) =>
-          tree.getPathToItem({ current: lastStateRef.current, targetId }) ?? []
+          treeHelper.getPathToItem({
+            current: lastStateRef.current,
+            targetId,
+          }) ?? []
       ),
       getMoveTargets,
       getChildrenOfItem,
@@ -248,8 +251,13 @@ export default function Tree() {
 
   return (
     <TreeContext.Provider value={context}>
-      <div style={{ display: "flex", justifyContent: "center", padding: 24 }}>
-        <div id="tree" ref={ref}>
+      <div
+       
+        className="flex justify-center  min-w-[800px] max-w-[800px] p-1 overflow-auto"
+      >
+        <div id="tree" ref={ref}
+        className="w-full h-full"
+        >
           {data.map((item, index, array) => {
             const mode: ItemMode = (() => {
               if (item.children.length && !!item?.open) {
