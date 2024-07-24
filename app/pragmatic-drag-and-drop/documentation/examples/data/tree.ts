@@ -19,8 +19,11 @@ export interface BaseTreeItem extends Record<string | symbol, unknown> {
   type: "group" | "attribute" | "footer";
 }
 
-interface GroupTreeItem extends BaseTreeItem {
+export interface GroupTreeItem extends BaseTreeItem {
   type: "group";
+  data: {
+    operator: "AND" | "OR";
+  };
 }
 
 export interface AttributeTreeItem extends BaseTreeItem {
@@ -70,11 +73,18 @@ export function getInitialData(): TreeItem[] {
       open: true,
       type: "group",
       treeRole: "root",
+      data: {
+        operator: "AND",
+      },
+      
       children: [
         {
           id: "1.3",
           open: true,
           type: "group",
+          data: {
+            operator: "AND",
+          },
           children: [
             {
               id: "1.3.1",
@@ -330,6 +340,9 @@ const dataReducer = (tree: TreeItem[], action: TreeAction) => {
         children: [],
         type: "group",
         open: true,
+        data: {
+          operator: "AND",
+        },
       };
     }
     return treeHelper.insertChild(tree, targetId, groupToAdd);

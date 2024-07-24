@@ -251,13 +251,8 @@ export default function Tree() {
 
   return (
     <TreeContext.Provider value={context}>
-      <div
-       
-        className="flex justify-center  min-w-[800px] max-w-[800px] p-1 overflow-auto"
-      >
-        <div id="tree" ref={ref}
-        className="w-full h-full"
-        >
+      <div className="flex justify-center p-1 overflow-auto">
+        <div id="tree" ref={ref} className="w-full h-full p-4">
           {data.map((item, index, array) => {
             const mode: ItemMode = (() => {
               if (item.children.length && !!item?.open) {
@@ -282,6 +277,7 @@ export default function Tree() {
             );
           })}
         </div>
+        <pre className="w-full">{JSON.stringify(data, null, 4)}</pre>
       </div>
     </TreeContext.Provider>
   );
